@@ -91,5 +91,33 @@ func (t *Todo) Delete(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (t *Todo) Toggle(w http.ResponseWriter, r *http.Request) error {
-	return JSON(w, http.StatusNotImplemented, nil)
+	var todo model.Todo
+	if err := json.NewDecoder(r.Body).Decode(&todo); err != nil {
+		return err
+	}
+
+	if err := TXHandler(t.DB, func(tx *sqlx.Tx) error {
+		result, err := todo.Toggle(tx)
+		if err != nil {
+			return err
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		todo.ID, err = result.LastInsertId()
+		return err
+	}); err != nil {
+		return err
+	}
+
+	return JSON(w, http.StatusOK, todo)
+}
+
+func (t *Todo) SearchByCompleted(w http.ResponseWriter, r *http.Request) error {
+	isDone := r.FormValue("completed")
+	todos, err := model.SearchByCompleted(t.DB, isDone)
+	if err != nil {
+		return err
+	}
+	return JSON(w, 200, todos)
 }
